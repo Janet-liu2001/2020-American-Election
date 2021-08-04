@@ -1,0 +1,250 @@
+---
+title: "Prediction of the result for 2020 American federal selection"
+subtitle: "Prediction of the odds of voting for Trump"
+author: "Jiahan Deng, Zhaonan Liu, Shijie Min, Tianyi Zhang"
+date: "2020/11/02"
+output: pdf_document
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.width = 5, fig.height = 3)
+```
+
+
+
+```{r include=FALSE}
+library(janitor)
+library(tidyverse)
+library(survey)
+
+sur_data <- read_csv("survey_data.csv")
+cen_data <- read_csv("census_data.csv")
+
+sur_data$cell<-paste(sur_data$HHIncome,sur_data$Sex)
+cen_data$cell<-paste(cen_data$HHIncome,cen_data$Sex)
+
+
+unique(sur_data$cell)
+unique(cen_data$cell)
+```
+```{r include=FALSE}
+library(lme4)
+library(brms)
+library(tidybayes)
+library(caret)
+library(ROCR)
+logmodle <- glmer(vote_2020~(1|cell)+HHIncome+Race+Age_group,
+                      data = sur_data, 
+                      family=binomial)
+
+summary(logmodle)
+
+library(pROC)
+prop_model1<-predict(logmodle,type=c('response'))
+model1_c<-ifelse(prop_model1>=0.5,"Joe Biden","Donald Trump")
+sur_outcome<-cbind(sur_data,model1_c)
+```
+
+
+## \textcolor{blue}{Introduction}
+Now the U.S. is facing one of the most important events which is the 2020 American federal selection. As people are curious about the final result, this analysis is about to build a regression model to predict the odds of voting Trump for 2020 American federal selection from the survey data(Insights into the beliefs and behaviors of American voters). The goal is to find out what factors might affect the voter’s opinion on the American federal selection. In this analysis, the assumption would be all the voters are American above 21, and all states follow the same voting scheme.
+
+## \textcolor{blue}{Data}
+
+\textcolor{red}{Survey Data}
+
+The survey produced by Nationscape conducts a weekly survey where the main phase being used here in the model is the newest from June 25th.(Insights into the beliefs and behaviors of American voters) Although roughly 200 variables were included in the dataset, in this report, 3 specific variables are chosen to build a model, and match with the variables in Census data.
+\newline
+
+
+\textcolor{red}{Census Data}
+
+The general taxonomy here includes: technical, geographic, group quarters, economic, demographic, race, education, work and income, 3 important variables from these groups were selected to match with the model. (Team, 2018) 
+\newline
+
+\textcolor{red}{Clean Data}
+
+For household income, the variables were separated into 9 groups(like <20000 to >250000) in order to make it easier for future analysis. For race, the variables were separated into 6 groups. For age, the variables were divided into 4 groups.
+
+## \textcolor{blue}{Model}
+In the following sections, there will be the final result and related analysis. Also, the model will be explained and the post-stratification calculation will be described as well. 
+
+\textcolor{red}{Model Specifics}
+
+In order to make the prediction for the binary result more accurate, the logistic regression model has been used for this research. Therefore, we assumed the observations are independent, and follow normal distribution.
+
+The logistic model is 
+
+$\log\Big(\dfrac{p}{1-p}\Big) = \beta_0+ \beta1x_{HHIncome>250000} + \beta2x_{HHIncome100000-150000} +\beta3x_{HHIncome150000-200000} + \beta4x_{HHIncome20000-40000} + \beta5x_{HHIncome200000-250000}+ \beta6x_{HHIncome40000-60000}+ \beta7x_{HHIncome60000-80000} + \beta8x_{HHIncome80000-100000}+ \beta9x_{RaceBlack/African American/Negro} +\beta10x_{RaceChinese} +\beta11x_{RaceJapanese} +\beta12x_{RaceOtherAsian}+\beta13x_{RaceSomeother} +\beta14x_{RaceWhite} +\beta15x_{Age>80} +\beta16x_{Age21-40}+\beta17x_{Age41-60} +\beta18x_{Age61-80}+\epsilon$
+
+In the function,  $y$ is the percentage of votes for Donald Trump. $\beta_0$ is the intercept, which is the probability of voting for Trump at a household income lower than 20000, do not tell the race and have an age lower than 21. Also, all other $\beta$ represents the possibility of a certain type of people voting for Donald Trump. For all the other $\beta$ except $\beta_0$, we would like to see a positive coefficient to illustrate that the type of people will vote for Donald Trump.
+\newline
+
+\textcolor{red}{Post-Stratification}
+
+
+To build this model, an essential technique that can be use is the post-stratification technique. It helps to calculate the population sizes within each post stratum in order to adjust the sampling weights. Therefore, the post-stratification data that helps with reducing bias.
+\newline
+For our model, there are 18 cells in total.  The variables used to create the cell are “HHIncome” and “Sex”. By combining the two variables, we have 18 cells with different sexuality and household income. Choosing "HHIncome" is because that different income levels usually affects largely on how people support who they want to vote as the candidates usually express their ideas towards different stratum. Choosing "Sex" is to test the gender discrimination on voting for different candidates because sometimes they held completely different strategy towards women and men. 
+
+
+## \textcolor{blue}{Result}
+Our final model for predicting odds of voting for Trump is:
+
+$\log\Big(\dfrac{p}{1-p}\Big) = -0.8397+ 0.55302x_{HHIncome>250000} + 0.39396 x_{HHIncome100000-150000} + 0.39593x_{HHIncome150000-200000} + 0.13333 x_{HHIncome20000-40000} + 1.04010x_{HHIncome200000-250000}+ 0.17503 x_{HHIncome40000-60000}+ 0.16074x_{HHIncome60000-80000}-0.06661 x_{HHIncome80000-100000}- 2.21481x_{RaceBlack/African American/Negro} -1.68703 \beta_11 x_{RaceChinese} -1.19435\beta_11 x_{RaceJapanese} -0.74053 x_{RaceOtherAsian}- 0.93605x_{RaceSomeother} -0.07464x_{RaceWhite} +1.18979x_{Age>80} +0.73724x_{Age21-40}+1.03264x_{Age41-60} +0.91648x_{Age61-80}+\epsilon$
+
+In the function,  $\log\Big(\dfrac{p}{1-p}\Big)$ is the odds of voting for Donald Trump. $\beta_0$ (-0.8397) is the intercept. This model shows the odds of voting Trump for people who has greater than 250000 household income is exp(0.55302) times the odds of people who has less than 20000 household income; the odds of voting Trump for people who are white exp(-0.075) times the odds of people who are American Indian or Alaska Native; the odds of voting Trump for people who is older than 80 is exp(-0.109) times the odds of people who is 20 years old or younger, etc.
+\newline
+By calculation, the proportion of voting for Donald Trump is around 41.15%.  This result is based on the post-stratification analysis of the proportion of voting for Donald Trump modelled by a logistic model, which accounted for Household Income, Race and Age. 
+\newline
+Two multilevel logistic models are built, one with "HHIcome", "Race", and "Age Group" as predictors, the other one with "Age Group", "Sex", "Education Level" as predictors. After comparing, the first model has a lower BIC and AIC value, which means it is more accurate and simple to build. Furthermore, the first model also has a higher ROC value, in other words, it can discriminate higher proportion of the data. So, the first model is choosed to be the final model. 
+
+
+
+## \textcolor{blue}{Discussion}
+
+\textcolor{red}{Summary}
+
+To predict the voting result for 2020 American federal selection, by choosing variables from the Survey data and Census data, through post-stratification, a logistic regression model is built.
+However, there are limitations in this research which create errors, and affect the prediction result.
+\newline
+
+\textcolor{red}{Conclusion}
+
+The calculated estimated proportion of voters in favor of voting for Trump is 0.41. Thus, the model predicts Biden will be the winner of the primary vote. Since the ROC curve shows that the area under the curve is 0.678, this means the logistic model can discriminate the voting portion for candidates 67.8% of the time.
+
+```{r echo=FALSE}
+roc_model1 <- roc(sur_outcome$vote_2020, prop_model1)
+plot(roc_model1, auc.polygon=TRUE, print.auc = TRUE,asp = NA)
+```
+
+
+```{r include=FALSE}
+vote_prob<-predict(logmodle,cen_data[,c("HHIncome","Race","Age_group","cell")],type="response")
+prediction_2020 <-ifelse(vote_prob>0.5,"Joe Biden","Donald Trump")
+result_cen<-cbind(cen_data,prediction_2020)
+```
+
+
+```{r include=FALSE}
+result_cen<-result_cen %>% 
+  mutate(trump_personweight = ifelse(result_cen$prediction_2020=="Donald Trump",result_cen$perwt,0))
+
+result_cen<-result_cen %>% 
+  mutate(biden_personweight = ifelse(result_cen$prediction_2020=="Joe Biden",result_cen$perwt,0))
+
+result_cen$biden_personweight <- as.numeric(result_cen$biden_personweight)
+result_cen$trump_personweight <- as.numeric(result_cen$trump_personweight)
+
+num_biden=sum(result_cen$biden_personweight)
+num_trump=sum(result_cen$trump_personweight)
+total_vote=num_biden+num_trump
+
+biden_per=(100*num_biden)/total_vote
+biden_per
+trump_per=(100*num_trump)/total_vote
+trump_per
+```
+
+```{r include=FALSE}
+library(dplyr)
+Totalvotestate<- result_cen%>%
+  group_by(State)%>%
+  summarise(Votes_trump=sum(trump_personweight),Votes_biden=sum(biden_personweight))
+
+
+sum(Totalvotestate$Votes_trump)
+sum(Totalvotestate$Votes_biden)
+
+
+Totalvotestate<-Totalvotestate %>% 
+  mutate(higher_per = ifelse(Totalvotestate$Votes_trump>Totalvotestate$Votes_biden,"Donald Trump","Joe Biden"))
+
+
+Totalvotestate<-Totalvotestate %>% 
+  mutate(num_represent = case_when(State=="AL"~7,
+                                   State=="AK"~1,
+                                   State=="AR"~4,
+                                     State=="AZ"~9,
+                                     State=="CA"~53,
+                                     State=="CO"~7,
+                                     State=="CT"~5,
+                                     State=="DC"~1,
+                                     State=="DE"~1,
+                                     State=="FL"~27,
+                                     State=="GA"~14,
+                                     State=="HI"~2,
+                                     State=="IA"~4,
+                                     State=="ID"~2,
+                                     State=="IL"~18,
+                                     State=="IN"~9,
+                                     State=="KS"~4,
+                                     State=="KY"~6,
+                                     State=="LA"~6,
+                                     State=="MA"~9,
+                                     State=="MD"~8,
+                                     State=="ME"~2,
+                                     State=="MI"~14,
+                                     State=="MN"~8,
+                                     State=="MO"~8,
+                                     State=="MS"~4,
+                                     State=="MT"~1,
+                                     State=="NC"~13,
+                                     State=="ND"~1,
+                                     State=="NE"~3,
+                                     State=="NH"~2,
+                                     State=="NJ"~12,
+                                     State=="NM"~3,
+                                     State=="NV"~4,
+                                     State=="NY"~27,
+                                     State=="OH"~16,
+                                     State=="OK"~5,
+                                     State=="OR"~5,
+                                     State=="PA"~18,
+                                     State=="RI"~2,
+                                     State=="SC"~7,
+                                     State=="SD"~1,
+                                     State=="TN"~9,
+                                     State=="TX"~36,
+                                     State=="UT"~4,
+                                     State=="VA"~11,
+                                     State=="VT"~1,
+                                     State=="WA"~10,
+                                     State=="WI"~8,
+                                     State=="WV"~3,
+                                     State=="WY"~1,)) 
+
+
+Winnerof2020 <- Totalvotestate %>% group_by(higher_per) %>% summarise(rep_votes=sum(num_represent))
+Winnerof2020
+```
+
+Here is the link for the poll of elections. https://projects.fivethirtyeight.com/polls/president-general/
+Although the prediction from the research of our model is not very accurate, which is 58.85%Biden vs 41.15%Trump by person weighted votes, and Trump gets 35 states representative voes vs Biden 401 representative votes. However in recent days the vote percentage gap between Biden and Trump is growing during time, and the latest poll shows 51%Biden vs 44%Trump vs 5%others. Even though the real life poll is approaching to the data prediction, the number might not be accurate. Overall, the predicted trend is correct. 
+\newline
+
+\textcolor{red}{Weaknesses}
+
+1. All the people who have the intention to vote but have not decided yet, and voting for someone else have been removed. However, those people’s opinions might affect the accuracy of the prediction. 
+
+2. Due to the technology difficulties, only 3 variables have been selected. So the model accuracy is limited. 
+
+3. Although there are many interesting points in the survey data, we cannot find the corresponding variables in the Census dataset. 
+\newline
+
+\textcolor{red}{Next Step}
+
+1. Undecided votes need to be record. 
+
+2. More levels of the modelling could be used for a higher focus on individuals and groups levels.
+
+3. Due to the technical issue, variables being chosen were limited(in this research only several variables were being discussed). If condition allows, more variables can be chosen so that the result will be more clear.
+
+## \textcolor{blue}{References}
+1. Survey data: Tausanovitch, Chris and Lynn Vavreck. 2020. Democracy Fund + UCLA Nationscape, October 10-17, 2019 (version 20200814). Retrieved from https://www.voterstudygroup.org/downloads?key=21bf654b-4376-40e2-83c8-def0421aab5d
+2. Census data: Team, M. (n.d.). U.S. CENSUS DATA FOR SOCIAL, ECONOMIC, AND HEALTH RESEARCH. Retrieved October 31, 2020, from https://usa.ipums.org/usa/index.shtml
+3. Representative: United States House of Representatives Seats by State. (n.d.). Retrieved November 01, 2020, from https://www.britannica.com/topic/United-States-House-of-Representatives-Seats-by-State-1787120
+
+.
